@@ -1,0 +1,4 @@
+git clone https://github.com/shayaanthedev/gravity-slingshot-sim.git
+cd gravity-slingshot-sim
+pip install pygame
+python main.py
