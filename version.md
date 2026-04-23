@@ -1,5 +1,7 @@
 # 📦 Version History
 
+## v1.2.1
+- Updated app icon
 ---
 
 ## v1.2.0
