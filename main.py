@@ -1,23 +1,31 @@
 import pygame
+import os
 import math
 
 pygame.init()
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1200, 800
 win = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Gravitational Slingshot Effect")
-pygame.display.set_icon(pygame.image.load("planet1.png"))
+pygame.display.set_icon(pygame.image.load(os.path.join("assets", "planet2.png")))
 
 G = 5
 FPS = 60
 OBJ_SIZE = 5
 VEL_SCALE = 100
 
-BG = pygame.transform.scale(pygame.image.load("spacebg.jpg"), (WIDTH, HEIGHT))
+MIN_ZOOM = 0.5
+MAX_ZOOM = 2.5
+ZOOM = 1.0
 
-EARTH_IMG = pygame.transform.scale(pygame.image.load("planet1.png"), (100, 100))
-JUPITER_IMG = pygame.transform.scale(pygame.image.load("planet2.png"), (160, 160))
-PLUTO_IMG = pygame.transform.scale(pygame.image.load("planet3.png"), (80, 80))
+BG = pygame.transform.scale(
+    pygame.image.load(os.path.join("assets", "spacebg.jpg")),
+    (WIDTH, HEIGHT)
+)
+
+EARTH_IMG = pygame.image.load(os.path.join("assets", "planet1.png")).convert_alpha()
+JUPITER_IMG = pygame.image.load(os.path.join("assets", "planet2.png")).convert_alpha()
+PLUTO_IMG = pygame.image.load(os.path.join("assets", "planet3.png")).convert_alpha()
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -25,8 +33,10 @@ BLUE = (0, 0, 255)
 
 GITHUB_TEXT = "GitHub: @shayaanthedev"
 
+TRAIL_ENABLED = False
+
 PLANET_OPTIONS = {
-    "earth": {"mass": 100, "image": EARTH_IMG},
+    "earth": {"mass": 350, "image": EARTH_IMG},
     "jupiter": {"mass": 750, "image": JUPITER_IMG},
     "pluto": {"mass": 40, "image": PLUTO_IMG}
 }
@@ -63,8 +73,20 @@ PLANET_MASS = 100
 SHIP_MASS = 5
 
 
+def world_to_screen(x, y):
+    sx = (x - WIDTH // 2) * ZOOM + WIDTH // 2
+    sy = (y - HEIGHT // 2) * ZOOM + HEIGHT // 2
+    return int(sx), int(sy)
+
+
+def screen_to_world(sx, sy):
+    x = (sx - WIDTH // 2) / ZOOM + WIDTH // 2
+    y = (sy - HEIGHT // 2) / ZOOM + HEIGHT // 2
+    return x, y
+
+
 def draw_github():
-    font = pygame.font.SysFont(None, 24)
+    font = pygame.font.SysFont("consolas", 24)
     text = font.render(GITHUB_TEXT, True, (180, 180, 180))
     win.blit(text, (10, HEIGHT - 30))
 
@@ -75,9 +97,17 @@ class Planet:
         self.y = y
         self.mass = mass
 
-    def draw(self):
-        size = PLANET_SIZE_CURRENT
-        win.blit(PLANET, (self.x - size, self.y - size))
+    def draw(self, image=None, size=None):
+        if image is None:
+            image = PLANET
+        if size is None:
+            size = PLANET_SIZE_CURRENT
+
+        sx, sy = world_to_screen(self.x, self.y)
+        scaled_size = max(1, int(size * ZOOM))
+
+        scaled_img = pygame.transform.smoothscale(image, (scaled_size * 2, scaled_size * 2))
+        win.blit(scaled_img, (sx - scaled_size, sy - scaled_size))
 
 
 class Spacecraft:
@@ -87,6 +117,7 @@ class Spacecraft:
         self.vel_x = vel_x
         self.vel_y = vel_y
         self.mass = mass
+        self.trail = []
 
     def move(self, planet):
         distance = math.sqrt((self.x - planet.x)**2 + (self.y - planet.y)**2)
@@ -105,7 +136,30 @@ class Spacecraft:
         self.y += self.vel_y
 
     def draw(self):
-        pygame.draw.circle(win, RED, (int(self.x), int(self.y)), OBJ_SIZE)
+        sx, sy = world_to_screen(self.x, self.y)
+        scaled_size = max(1, int(OBJ_SIZE * ZOOM))
+        pygame.draw.circle(win, RED, (sx, sy), scaled_size)
+
+        if TRAIL_ENABLED:
+            self.trail.append((self.x, self.y))
+
+            if len(self.trail) > 200:
+                self.trail.pop(0)
+
+            for i in range(1, len(self.trail)):
+                fade = int(255 * i / len(self.trail))
+                x1, y1 = world_to_screen(*self.trail[i - 1])
+                x2, y2 = world_to_screen(*self.trail[i])
+
+                pygame.draw.line(
+                    win,
+                    (fade, fade, fade),
+                    (x1, y1),
+                    (x2, y2),
+                    max(1, int(2 * ZOOM))
+                )
+        else:
+            self.trail.clear()
 
 
 def create_ship(location, mouse):
@@ -117,32 +171,82 @@ def create_ship(location, mouse):
 
 
 def draw_info():
-    font = pygame.font.SysFont(None, 28)
+    font = pygame.font.SysFont("verdana", 28)
     info = PLANET_INFO[CURRENT_PLANET_KEY]
     text = f"{info['name']} | Mass: {info['mass_text']} | Radius: {info['radius']}"
     render = font.render(text, True, WHITE)
     win.blit(render, (10, 10))
 
 
+def draw_hud():
+    font = pygame.font.SysFont("verdana", 22)
+    trail_status = font.render(f"Trail [T]: {'ON' if TRAIL_ENABLED else 'OFF'}", True, WHITE)
+    zoom_status = font.render(f"Zoom [Scroll]: {ZOOM:.1f}x", True, WHITE)
+    win.blit(trail_status, (WIDTH - 250, 10))
+    win.blit(zoom_status, (WIDTH - 250, 38))
+
+
+def draw_centered_text(font, text, y, color=WHITE):
+    render = font.render(text, True, color)
+    win.blit(render, (WIDTH // 2 - render.get_width() // 2, y))
+
+
 def menu():
     global PLANET, PLANET_MASS, CURRENT_PLANET_KEY, PLANET_SIZE_CURRENT
 
-    font = pygame.font.SysFont(None, 50)
+    title_font = pygame.font.SysFont("arial", 44, bold=True)
+    body_font = pygame.font.SysFont("arial", 24)
+    small_font = pygame.font.SysFont("arial", 20)
+
     running = True
 
     while running:
         win.fill((0, 0, 0))
 
-        title = font.render("Select Planet", True, WHITE)
-        win.blit(title, (WIDTH//2 - 150, 100))
+        draw_centered_text(title_font, "Gravitational Slingshot Effect", 40)
+        pygame.draw.line(win, WHITE, (180, 105), (WIDTH - 180, 105), 2)
 
-        earth_text = font.render("1. Earth", True, BLUE)
-        jupiter_text = font.render("2. Jupiter", True, BLUE)
-        pluto_text = font.render("3. Pluto", True, BLUE)
+        draw_centered_text(body_font, "What is a gravitational slingshot?", 130)
+        draw_centered_text(
+            small_font,
+            "It is when a spacecraft uses a planet's gravity to change speed and direction.",
+            165
+        )
+        draw_centered_text(
+            small_font,
+            "The planet pulls the spacecraft, and the spacecraft can gain or lose speed from that motion.",
+            192
+        )
 
-        win.blit(earth_text, (WIDTH//2 - 100, 200))
-        win.blit(jupiter_text, (WIDTH//2 - 100, 300))
-        win.blit(pluto_text, (WIDTH//2 - 100, 400))
+        pygame.draw.line(win, WHITE, (180, 235), (WIDTH - 180, 235), 2)
+
+        draw_centered_text(body_font, "Select a planet", 255)
+
+        draw_centered_text(body_font, "1. Earth", 310)
+        draw_centered_text(small_font, "Balanced gravity and a good starting point.", 345)
+
+        draw_centered_text(body_font, "2. Jupiter", 395)
+        draw_centered_text(small_font, "Stronger pull, so the spacecraft bends more sharply.", 430)
+
+        draw_centered_text(body_font, "3. Pluto", 480)
+        draw_centered_text(small_font, "Weaker gravity, so the motion is softer and slower.", 515)
+
+        pygame.draw.line(win, WHITE, (180, 560), (WIDTH - 180, 560), 2)
+
+        draw_centered_text(body_font, "How to use the program", 580)
+        draw_centered_text(small_font, "Press 1, 2, or 3 to choose a planet.", 615)
+        draw_centered_text(
+            small_font,
+            "In the simulation, click once to set the ship start point, then click again to launch it.",
+            642
+        )
+        draw_centered_text(
+            small_font,
+            "Press T to toggle trails and use the mouse wheel to zoom.",
+            669
+        )
+
+        draw_centered_text(small_font, "Press the number key to start.", 720)
 
         draw_github()
         pygame.display.update()
@@ -153,7 +257,6 @@ def menu():
                 exit()
 
             if event.type == pygame.KEYDOWN:
-
                 if event.key == pygame.K_1:
                     PLANET = PLANET_OPTIONS["earth"]["image"]
                     PLANET_MASS = PLANET_OPTIONS["earth"]["mass"]
@@ -177,7 +280,7 @@ def menu():
 
 
 def main():
-    menu()
+    global TRAIL_ENABLED, ZOOM
 
     running = True
     clock = pygame.time.Clock()
@@ -192,25 +295,35 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                pygame.quit()
+                return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    main()
-                    return
+                    return  # FIXED (no recursion)
+
+                if event.key == pygame.K_t:
+                    TRAIL_ENABLED = not TRAIL_ENABLED
+
+            if event.type == pygame.MOUSEWHEEL:
+                ZOOM = max(MIN_ZOOM, min(MAX_ZOOM, ZOOM + event.y * 0.1))
 
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if temp_obj_pos:
-                    obj = create_ship(temp_obj_pos, mouse_pos)
-                    objects.append(obj)
-                    temp_obj_pos = None
-                else:
-                    temp_obj_pos = mouse_pos
+                if event.button == 1:
+                    if temp_obj_pos:
+                        world_start = screen_to_world(*temp_obj_pos)
+                        world_mouse = screen_to_world(*mouse_pos)
+                        obj = create_ship(world_start, world_mouse)
+                        objects.append(obj)
+                        temp_obj_pos = None
+                    else:
+                        temp_obj_pos = mouse_pos
 
         win.blit(BG, (0, 0))
 
         draw_info()
         draw_github()
+        draw_hud()
 
         if temp_obj_pos:
             pygame.draw.line(win, WHITE, temp_obj_pos, mouse_pos, 2)
@@ -220,7 +333,11 @@ def main():
             obj.draw()
             obj.move(planet)
 
-            off_screen = obj.x < 0 or obj.x > WIDTH or obj.y < 0 or obj.y > HEIGHT
+            sx, sy = world_to_screen(obj.x, obj.y)
+
+            margin = int(200 / ZOOM)
+            off_screen = sx < -margin or sx > WIDTH + margin or sy < -margin or sy > HEIGHT + margin
+
             collided = math.sqrt((obj.x - planet.x)**2 + (obj.y - planet.y)**2) <= PLANET_SIZE_CURRENT
 
             if off_screen or collided:
@@ -230,8 +347,9 @@ def main():
 
         pygame.display.update()
 
-    pygame.quit()
-
 
 if __name__ == "__main__":
-    main()
+    while True:  
+        menu()
+        main()
+        ZOOM = 1.0
