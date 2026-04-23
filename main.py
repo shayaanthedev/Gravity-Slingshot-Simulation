@@ -7,7 +7,7 @@ pygame.init()
 WIDTH, HEIGHT = 1200, 800
 win = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Gravitational Slingshot Effect")
-pygame.display.set_icon(pygame.image.load(os.path.join("assets", "planet2.png")))
+pygame.display.set_icon(pygame.image.load(os.path.join("assets", "appicon.png")))
 
 G = 5
 FPS = 60
