@@ -2,7 +2,7 @@
 
 ## v1.2.1
 - Updated app icon
----
+
 
 ## v1.2.0
 
@@ -19,7 +19,7 @@
 - Fixed spacecraft disappearing too early when zoomed out
 - Improved off-screen detection using zoom-aware margins
 
----
+
 
 ## v1.1.0 
 
@@ -29,7 +29,7 @@
 - General UI layout and readability
 - Better organization of planet-related data
 
----
+
 
 ##  v1.0.0 
 
