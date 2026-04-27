@@ -14,13 +14,23 @@ https://github.com/user-attachments/assets/175ea1c9-31ba-4fa7-b6f7-787eb113016c
 
 
 ## ⚙️ Installation
+### Option 1 — Clone & Run
 
-Check the **installation file** to install and run the project.
+```bash
+git clone https://github.com/shayaanthedev/Gravity-Slingshot-Simulation.git
+cd Gravity-Slingshot-Simulation
+pip install pygame
+python main.py
+```
+### Option 2 — Download Release
+Go to the Releases section
 
-## 📁 Requirements
+Download the latest version
 
-- Python 3.x  
-- Pygame  
+Extract the files
+
+Run the executable
+
 
 ## ⭐ Support
 If you like this project, consider giving it a star ⭐
